@@ -159,7 +159,9 @@ public final class OpenGraphParser {
                         title: content,
                         type: metadata.type,
                         url: metadata.url,
+                        siteName: metadata.siteName,
                         image: metadata.image,
+                        imageAltDescription: metadata.imageAltDescription,
                         description: metadata.description
                     )
                 case "og:type":
@@ -167,7 +169,9 @@ public final class OpenGraphParser {
                         title: metadata.title,
                         type: content,
                         url: metadata.url,
+                        siteName: metadata.siteName,
                         image: metadata.image,
+                        imageAltDescription: metadata.imageAltDescription,
                         description: metadata.description
                     )
                 case "og:url":
@@ -176,26 +180,52 @@ public final class OpenGraphParser {
                             title: metadata.title,
                             type: metadata.type,
                             url: url,
+                            siteName: metadata.siteName,
                             image: metadata.image,
+                            imageAltDescription: metadata.imageAltDescription,
                             description: metadata.description
                         )
                     }
+                case "og:site_name":
+                    metadata = OpenGraphMetadata(
+                        title: metadata.title,
+                        type: metadata.type,
+                        url: metadata.url,
+                        siteName: content,
+                        image: metadata.image,
+                        imageAltDescription: metadata.imageAltDescription,
+                        description: metadata.description
+                    )
                 case "og:image":
                     if let imageURL = URL(string: content), imageURL.scheme != nil {
                         metadata = OpenGraphMetadata(
                             title: metadata.title,
                             type: metadata.type,
                             url: metadata.url,
+                            siteName: metadata.siteName,
                             image: imageURL,
+                            imageAltDescription: metadata.imageAltDescription,
                             description: metadata.description
                         )
                     }
+                case "og:image:alt":    // imageAltDescription
+                    metadata = OpenGraphMetadata(
+                        title: metadata.title,
+                        type: metadata.type,
+                        url: metadata.url,
+                        siteName: metadata.siteName,
+                        image: metadata.image,
+                        imageAltDescription: content,
+                        description: metadata.description
+                    )
                 case "og:description":
                     metadata = OpenGraphMetadata(
                         title: metadata.title,
                         type: metadata.type,
                         url: metadata.url,
+                        siteName: metadata.siteName,
                         image: metadata.image,
+                        imageAltDescription: metadata.imageAltDescription,
                         description: content
                     )
                 default:
@@ -208,7 +238,7 @@ public final class OpenGraphParser {
     }
     
     private func extractMetaTags(from html: String) throws -> [[String: String]] {
-        let pattern = #"<meta\s+property="(og:[^"]+)"\s+content="([^"]+)"\s*/?>"#
+        let pattern = #"<meta\s+(?:content="([^"]+)"\s+property="(og:[^"]+)"|property="(og:[^"]+)"\s+content="([^"]+)")\s*/?>"#
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
             throw OpenGraphParserError.parsingError("Failed to create regular expression")
         }
@@ -216,15 +246,22 @@ public final class OpenGraphParser {
         let matches = regex.matches(in: html, options: [], range: NSRange(html.startIndex..., in: html))
         
         return matches.compactMap { match in
-            guard let propertyRange = Range(match.range(at: 1), in: html),
-                  let contentRange = Range(match.range(at: 2), in: html) else {
+            guard let firstTagRange = Range(match.range(at: 1), in: html),
+                  let secondTagRange = Range(match.range(at: 2), in: html) else {
                 return nil
             }
             
-            let property = String(html[propertyRange])
-            let content = String(html[contentRange])
+            let firstTag = String(html[firstTagRange])
+            let secondTag = String(html[secondTagRange])
             
-            return ["property": property, "content": content]
+            if firstTag.hasPrefix("og:") {
+                return ["property": firstTag, "content": secondTag]
+            }
+            else {
+                return ["property": secondTag, "content": firstTag]
+
+            }
+            
         }
     }
 }
